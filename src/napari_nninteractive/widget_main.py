@@ -1,4 +1,5 @@
 import os
+import napari
 import warnings
 from pathlib import Path
 from typing import Any, Optional
@@ -197,11 +198,10 @@ class nnInteractiveWidget(LayerControls):
 
     def on_load_mask(self):
 
-        _layer_data = self._viewer.layers[self.label_for_init.currentText()].data
-
-        assert (
-            _layer_data.shape == self.session_cfg["shape"]
-        )  # Labels and Image should have same shape
+        selected_layers = list(self._viewer.layers.selection)
+        assert len(selected_layers) == 1 and isinstance(selected_layers[0], napari.layers.Labels) # should be a single label type layer
+        _layer_data = selected_layers[0].data
+        assert (_layer_data.shape == self.session_cfg["shape"])  # Labels and Image should have same shape
 
         data = _layer_data == self.class_for_init.value()
 
@@ -213,3 +213,42 @@ class nnInteractiveWidget(LayerControls):
                 self._viewer.layers[self.label_layer_name].refresh()
         else:
             warnings.warn("Mask is not valid - probably its empty", UserWarning, stacklevel=1)
+
+
+    def on_merge_mask(self):
+        warnings.warn("Overlapped mask region will be overridden", UserWarning, stacklevel=1)
+        
+        shape = self.session_cfg["shape"]
+        data = np.zeros(shape, dtype=np.uint8)
+        selected_layers = list(self._viewer.layers.selection)
+        
+        global_id_now = 1
+        any_valid = False
+        
+        for layer in selected_layers:
+            _layer_data = layer.data
+            
+            if _layer_data.shape != shape or np.amax(_layer_data) == 0:
+                continue
+            
+            any_valid = True
+            
+            # Pre-allocate lookup table for faster remapping
+            max_id = int(np.amax(_layer_data))
+            id_map = np.zeros(max_id + 1, dtype=np.uint8)
+            
+            unique_ids = np.unique(_layer_data)
+            unique_ids = unique_ids[unique_ids > 0]
+            
+            for idx in unique_ids:
+                id_map[idx] = global_id_now
+                global_id_now += 1
+            
+            mask = _layer_data > 0
+            data[mask] = id_map[_layer_data[mask]]
+        
+        if any_valid and np.any(data):
+            self._viewer.layers.remove_selected()  # dispose
+            self.add_label_layer(data, 'Merged Object Layer')
+        else:
+            warnings.warn("Merged Object layers are not valid - probably empty", UserWarning, stacklevel=1)

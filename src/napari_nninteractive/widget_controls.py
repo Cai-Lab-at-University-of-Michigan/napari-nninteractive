@@ -519,7 +519,8 @@ class LayerControls(BaseGUI):
                     _file_name = f"{_output_file}_{str(_index).zfill(4)}{_dtype}"
                 elif f"semantic map - {self.session_cfg['name']}" == _layer.name:
                     _file_name = f"{_output_file}_semantic_map{_dtype}"
-
+                elif "Merged Object" in _layer.name:
+                    _file_name = f"{_output_file}_merged_objects{_dtype}"
                 else:
                     continue
 

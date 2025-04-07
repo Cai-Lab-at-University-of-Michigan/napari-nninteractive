@@ -88,6 +88,7 @@ class BaseGUI(QWidget):
         self.auto_refine.setEnabled(False)
         # self.empty_mask_btn.setEnabled(False)
         self.load_mask_btn.setEnabled(False)
+        self.merge_mask_btn.setEnabled(False)
         self.add_button.setEnabled(False)
         self.add_ckbx.setEnabled(False)
 
@@ -109,6 +110,7 @@ class BaseGUI(QWidget):
         self.auto_refine.setEnabled(True)
         # self.empty_mask_btn.setEnabled(True)
         self.load_mask_btn.setEnabled(True)
+        self.merge_mask_btn.setEnabled(True)
         self.add_button.setEnabled(True)
         self.add_ckbx.setEnabled(True)
 
@@ -164,7 +166,8 @@ class BaseGUI(QWidget):
             "new_labels",
             self._viewer.theme,
             self.on_init,
-            tooltips="Initialize the Model and Image Pair",
+            tooltips="Initialize the Model and Image Pair- press I",
+            shortcut="I",
         )
 
         self.reset_interaction_button = setup_iconbutton(
@@ -173,8 +176,8 @@ class BaseGUI(QWidget):
             "delete",
             self._viewer.theme,
             self.on_reset_interactions,
-            tooltips="Keep Model and Image Pair, just reset the interactions for the current object  - press R",
-            shortcut="R",
+            tooltips="Keep Model and Image Pair, just reset the interactions for the current object  - press D",
+            shortcut="D",
         )
         self.reset_button = setup_iconbutton(
             _layout,
@@ -182,8 +185,8 @@ class BaseGUI(QWidget):
             "step_right",
             self._viewer.theme,
             self.on_next,
-            tooltips="Keep current segmentation and go to the next object - press M",
-            shortcut="M",
+            tooltips="Keep current segmentation and go to the next object - press N",
+            shortcut="N",
         )
 
         self.instance_aggregation_ckbx = setup_checkbox(
@@ -200,7 +203,7 @@ class BaseGUI(QWidget):
     def _init_init_buttons(self):
         """Initializes the control buttons (Initialize and Reset)."""
         _group_box, _layout = setup_vcollapsiblegroupbox(
-            text="Initialize with Segmentation:", collapsed=True
+            text="Initialize with Segmentation:", collapsed=False
         )
 
         h_layout = QHBoxLayout()
@@ -219,10 +222,22 @@ class BaseGUI(QWidget):
 
         self.load_mask_btn = setup_iconbutton(
             _layout,
-            "Initialize with Mask",
+            "Load Single Object",
             "logo_silhouette",
             self._viewer.theme,
             self.on_load_mask,
+            tooltips="Load one object from the selected object layer- press O",
+            shortcut="O",
+        )
+
+        self.merge_mask_btn = setup_iconbutton(
+            _layout,
+            "Merge Objects",
+            "logo_silhouette",
+            self._viewer.theme,
+            self.on_merge_mask,
+            tooltips="Merge the selected object layers into one - press M",
+            shortcut="M",
         )
 
         self.auto_refine = setup_checkbox(
@@ -287,7 +302,7 @@ class BaseGUI(QWidget):
 
     def _init_run_button(self) -> QGroupBox:
         """Initializes the run button and auto-run checkbox"""
-        _group_box, _layout = setup_vcollapsiblegroupbox(text="Manual Control:", collapsed=True)
+        _group_box, _layout = setup_vcollapsiblegroupbox(text="Manual Control:", collapsed=False)
 
         h_layout = QHBoxLayout()
         _layout.addLayout(h_layout)
@@ -306,13 +321,14 @@ class BaseGUI(QWidget):
             "right_arrow",
             self._viewer.theme,
             self.on_run,
-            tooltips="Run the predict step",
+            tooltips="Run the predict step - press R",
+            shortcut="R"
         )
 
         self.run_ckbx = setup_checkbox(
             _layout,
             "Auto Run Prediction",
-            True,
+            False,
             tooltips="Run automatically after each interaction",
         )
 
@@ -331,7 +347,13 @@ class BaseGUI(QWidget):
         _group_box, _layout = setup_vgroupbox(text="")
 
         self.export_button = setup_iconbutton(
-            _layout, "Export", "pop_out", self._viewer.theme, self._export
+            _layout, 
+            "Export", 
+            "pop_out", 
+            self._viewer.theme, 
+            self._export,
+            tooltips="Export results to folder - press E",
+            shortcut="E"
         )
         _group_box.setLayout(_layout)
         return _group_box
@@ -376,6 +398,9 @@ class BaseGUI(QWidget):
         print("on_propagate_ckbx", *args, **kwargs)
 
     def on_load_mask(self):
+        pass
+
+    def on_merge_mask(self):
         pass
 
     def add_mask_init_layer(self):
