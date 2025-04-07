@@ -219,17 +219,17 @@ class nnInteractiveWidget(LayerControls):
         warnings.warn("Overlapped mask region will be overridden", UserWarning, stacklevel=1)
 
         shape = self.session_cfg["shape"]
-        data = np.zeros(shape, dtype=np.uint32)
         selected_layers = list(self._viewer.layers.selection)
         
         is_merged_object_existed = any(self.merged_object_layer_name == l.name for l in self._viewer.layers)
         global_id_now = 1 if not is_merged_object_existed else np.amax(self._viewer.layers[self.merged_object_layer_name].data) + 1
+        data = np.zeros(shape, dtype=np.uint32) if not is_merged_object_existed else self._viewer.layers[self.merged_object_layer_name].data.copy()
         any_valid = False
         
         for layer in selected_layers:
             _layer_data = layer.data
             
-            if _layer_data.shape != shape or np.amax(_layer_data) == 0:
+            if _layer_data.shape != shape or np.amax(_layer_data) == 0 or layer.name == self.merged_object_layer_name:
                 continue
             
             any_valid = True
@@ -248,10 +248,14 @@ class nnInteractiveWidget(LayerControls):
             data[mask] = id_map[_layer_data[mask]]
         
         if any_valid and np.any(data):
-            self._viewer.layers.remove_selected()  # dispose
             if is_merged_object_existed:
                 self._viewer.layers[self.merged_object_layer_name].refresh()
             else:
                 self.add_label_layer(data, self.merged_object_layer_name)
+                
+            for layer in selected_layers: # dispose
+                if layer.name in [self.merged_object_layer_name, self.label_layer_name]:
+                    continue
+                self._viewer.layers.remove(layer.name)
         else:
             warnings.warn("Merged Object layers are not valid - probably empty", UserWarning, stacklevel=1)
