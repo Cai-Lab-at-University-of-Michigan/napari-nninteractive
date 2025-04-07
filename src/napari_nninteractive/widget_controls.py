@@ -56,6 +56,7 @@ class LayerControls(BaseGUI):
 
         self.label_layer_name = "nnInteractive - Label Layer"
         self.semantic_layer_name = "nnInteractive - Label Layer"
+        self.merged_object_layer_name = "Merged Objects - Label Layer"
         self.colormap = ColorMapper(49, seed=0.5, background_value=0)
         self._scribble_brush_size = 5
         self.object_index = 0
@@ -519,7 +520,7 @@ class LayerControls(BaseGUI):
                     _file_name = f"{_output_file}_{str(_index).zfill(4)}{_dtype}"
                 elif f"semantic map - {self.session_cfg['name']}" == _layer.name:
                     _file_name = f"{_output_file}_semantic_map{_dtype}"
-                elif "Merged Object" in _layer.name:
+                elif "Merged Objects" in _layer.name:
                     _file_name = f"{_output_file}_merged_objects{_dtype}"
                 else:
                     continue
