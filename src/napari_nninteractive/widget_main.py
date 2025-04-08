@@ -214,22 +214,41 @@ class nnInteractiveWidget(LayerControls):
         else:
             warnings.warn("Mask is not valid - probably its empty", UserWarning, stacklevel=1)
 
-
     def on_merge_mask(self):
+        shape = self.session_cfg["shape"]
+        selected_layers = list(self._viewer.layers.selection)
+
+        assert len(selected_layers) >= 2
+        merge_to_layer_name = selected_layers[0].name
+        data = selected_layers[0].data.copy()
+
+        for layer in selected_layers: # dispose
+            _layer_data = layer.data
+            if _layer_data.shape != shape or layer.name in [merge_to_layer_name, self.archive_layer_name] or not isinstance(layer, napari.layers.Labels) or np.amax(_layer_data) == 0:
+                continue
+            
+            data[_layer_data > 0] = 1
+            self._viewer.layers.remove(layer.name)
+
+        if np.any(data):
+            self._viewer.layers[merge_to_layer_name].data = data
+            self._viewer.layers[merge_to_layer_name].refresh()
+
+    def on_archive_object(self):
         warnings.warn("Overlapped mask region will be overridden", UserWarning, stacklevel=1)
 
         shape = self.session_cfg["shape"]
         selected_layers = list(self._viewer.layers.selection)
         
-        is_merged_object_existed = any(self.merged_object_layer_name == l.name for l in self._viewer.layers)
-        global_id_now = 1 if not is_merged_object_existed else np.amax(self._viewer.layers[self.merged_object_layer_name].data) + 1
-        data = np.zeros(shape, dtype=np.uint32) if not is_merged_object_existed else self._viewer.layers[self.merged_object_layer_name].data.copy()
+        is_merged_object_existed = any(self.archive_layer_name == l.name for l in self._viewer.layers)
+        global_id_now = 1 if not is_merged_object_existed else np.amax(self._viewer.layers[self.archive_layer_name].data) + 1
+        data = np.zeros(shape, dtype=np.uint32) if not is_merged_object_existed else self._viewer.layers[self.archive_layer_name].data.copy()
         any_valid = False
         
         for layer in selected_layers:
             _layer_data = layer.data
             
-            if _layer_data.shape != shape or np.amax(_layer_data) == 0 or layer.name == self.merged_object_layer_name:
+            if _layer_data.shape != shape or layer.name == self.archive_layer_name or not isinstance(layer, napari.layers.Labels) or np.amax(_layer_data) == 0:
                 continue
             
             any_valid = True
@@ -246,16 +265,14 @@ class nnInteractiveWidget(LayerControls):
             
             mask = _layer_data > 0
             data[mask] = id_map[_layer_data[mask]]
+            if layer.name not in [self.archive_layer_name, self.label_layer_name]:
+                self._viewer.layers.remove(layer.name)
         
         if any_valid and np.any(data):
             if is_merged_object_existed:
-                self._viewer.layers[self.merged_object_layer_name].refresh()
+                self._viewer.layers[self.archive_layer_name].data = data
+                self._viewer.layers[self.archive_layer_name].refresh()
             else:
-                self.add_label_layer(data, self.merged_object_layer_name)
-                
-            for layer in selected_layers: # dispose
-                if layer.name in [self.merged_object_layer_name, self.label_layer_name]:
-                    continue
-                self._viewer.layers.remove(layer.name)
+                self.add_label_layer(data, self.archive_layer_name)
         else:
             warnings.warn("Merged Object layers are not valid - probably empty", UserWarning, stacklevel=1)

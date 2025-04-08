@@ -89,6 +89,7 @@ class BaseGUI(QWidget):
         # self.empty_mask_btn.setEnabled(False)
         self.load_mask_btn.setEnabled(False)
         self.merge_mask_btn.setEnabled(False)
+        self.archive_object_btn.setEnabled(False)
         self.add_button.setEnabled(False)
         self.add_ckbx.setEnabled(False)
 
@@ -111,6 +112,7 @@ class BaseGUI(QWidget):
         # self.empty_mask_btn.setEnabled(True)
         self.load_mask_btn.setEnabled(True)
         self.merge_mask_btn.setEnabled(True)
+        self.archive_object_btn.setEnabled(True)
         self.add_button.setEnabled(True)
         self.add_ckbx.setEnabled(True)
 
@@ -236,8 +238,18 @@ class BaseGUI(QWidget):
             "logo_silhouette",
             self._viewer.theme,
             self.on_merge_mask,
-            tooltips="Merge the selected object layers into one - press M",
+            tooltips="Merge the selected object layers into one object - press M",
             shortcut="M",
+        )
+
+        self.archive_object_btn = setup_iconbutton(
+            _layout,
+            "Archive Objects",
+            "logo_silhouette",
+            self._viewer.theme,
+            self.on_archive_object,
+            tooltips="Archive all selected object layers - press A",
+            shortcut="A",
         )
 
         self.auto_refine = setup_checkbox(
@@ -401,6 +413,9 @@ class BaseGUI(QWidget):
         pass
 
     def on_merge_mask(self):
+        pass
+
+    def on_archive_object(self):
         pass
 
     def add_mask_init_layer(self):

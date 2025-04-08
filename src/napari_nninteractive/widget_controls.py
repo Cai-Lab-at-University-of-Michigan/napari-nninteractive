@@ -1,5 +1,7 @@
 import os
 import warnings
+import datetime
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -11,7 +13,9 @@ from napari.layers.base._base_constants import ActionType
 from napari.utils.notifications import show_warning
 from napari.utils.transforms import Affine
 from napari.viewer import Viewer
-from qtpy.QtWidgets import QFileDialog, QWidget
+from qtpy.QtWidgets import QFileDialog, QWidget, QMessageBox, QDialog, QVBoxLayout, QLabel
+
+from qtpy.QtCore import QTimer, QEvent, Qt
 
 from napari_nninteractive.controls.bbox_controls import CustomQtBBoxControls
 from napari_nninteractive.controls.lasso_controls import CustomQtLassoControls
@@ -56,12 +60,28 @@ class LayerControls(BaseGUI):
 
         self.label_layer_name = "nnInteractive - Label Layer"
         self.semantic_layer_name = "nnInteractive - Label Layer"
-        self.merged_object_layer_name = "Merged Objects - Label Layer"
+        self.archive_layer_name = "Merged Objects - Label Layer"
         self.colormap = ColorMapper(49, seed=0.5, background_value=0)
         self._scribble_brush_size = 5
         self.object_index = 0
 
+        # Initialize auto-save timer
+        self.auto_save_timer = QTimer(self)
+        self.auto_save_timer.timeout.connect(self._auto_save)
+        self.auto_save_interval_minutes = 15
+
+        self.inactivity_timer = QTimer(self)
+        self.inactivity_timer.timeout.connect(self._handle_inactivity)
+        self.inactivity_timeout_minutes = 30
+        self.last_activity_time = datetime.datetime.now()
+        
+        self.start_auto_save_timer()
+        self.start_inactivity_timer()
+
+        self._viewer.window._qt_viewer.installEventFilter(self)
         self._viewer.layers.selection.events.active.connect(self.on_layer_selected)
+
+        self._is_initialized = False
 
     # Layer Handling
     def _clear_layers(self) -> None:
@@ -337,6 +357,7 @@ class LayerControls(BaseGUI):
 
         # Lock the Session
         self._lock_session()
+        self._is_initialized = False
 
     def on_reset_interactions(self):
         """Reset only the current interaction"""
@@ -546,3 +567,204 @@ class LayerControls(BaseGUI):
                 del _layer_temp
         else:
             raise ValueError("Output path has to be a directory, not a file")
+
+    # activity event filter
+    def eventFilter(self, obj, event):
+        """
+        Event filter to track user activity.
+        This method is called for every event in the application.
+        """
+        
+        activity_events = [
+            QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove,
+            QEvent.KeyPress, QEvent.KeyRelease
+        ]
+        
+        if event.type() in activity_events:
+            self.last_activity_time = datetime.datetime.now()
+            
+        return False
+
+    def start_inactivity_timer(self):
+        """Start the inactivity detection timer."""
+        # Check for inactivity every minute
+        self.inactivity_timer.start(60000)
+    
+    def stop_inactivity_timer(self):
+        """Stop the inactivity detection timer."""
+        self.inactivity_timer.stop()
+    
+    def set_inactivity_timeout(self, minutes: int):
+        """Set the inactivity timeout in minutes."""
+        self.inactivity_timeout_minutes = minutes
+
+    def _handle_inactivity(self):
+        """
+        Handle inactivity by auto-saving and presenting a notice to the user.
+        The application will automatically quit if the user doesn't press any key
+        within 1 minute. Any key press will continue the session.
+        """
+        current_time = datetime.datetime.now()
+        elapsed_minutes = (current_time - self.last_activity_time).total_seconds() / 60
+        
+        if elapsed_minutes >= self.inactivity_timeout_minutes:
+            self._auto_save()
+            self.inactivity_timer.stop()
+            
+            message = f"No activity detected for {self.inactivity_timeout_minutes} minutes.\n"
+            message += "Your work has been auto-saved."
+            
+            class KeyPressDialog(QDialog):
+                def __init__(self, parent=None):
+                    super().__init__(parent)
+                    self.setWindowTitle("Inactivity Detected")
+                    self.setWindowFlag(Qt.WindowStaysOnTopHint)
+                    self.setMinimumWidth(400)
+                    
+                    layout = QVBoxLayout()
+                    
+                    messageLabel = QLabel(message)
+                    messageLabel.setAlignment(Qt.AlignCenter)
+                    layout.addWidget(messageLabel)
+                    
+                    keyPressLabel = QLabel("Press any key to continue working")
+                    keyPressLabel.setAlignment(Qt.AlignCenter)
+                    keyPressLabel.setStyleSheet("font-weight: bold; color: blue; font-size: 14px;")
+                    layout.addWidget(keyPressLabel)
+                    
+                    self.countdownLabel = QLabel("Time remaining: 60 seconds")
+                    self.countdownLabel.setAlignment(Qt.AlignCenter)
+                    layout.addWidget(self.countdownLabel)
+                    
+                    autoCloseLabel = QLabel("Application will close automatically if no key is pressed")
+                    autoCloseLabel.setAlignment(Qt.AlignCenter)
+                    autoCloseLabel.setStyleSheet("color: gray;")
+                    layout.addWidget(autoCloseLabel)
+                    
+                    self.setLayout(layout)
+                
+                def keyPressEvent(self, event):
+                    # Any key press will continue the session
+                    self.accept()
+            
+            dialog = KeyPressDialog(self)
+            
+            seconds_left = 30
+            countdownTimer = QTimer()
+            
+            def update_countdown():
+                nonlocal seconds_left
+                seconds_left -= 1
+                dialog.countdownLabel.setText(f"Time remaining: {seconds_left} seconds")
+                
+                if seconds_left <= 5:
+                    dialog.countdownLabel.setStyleSheet("color: red; font-weight: bold;")
+                
+                if seconds_left <= 0:
+                    countdownTimer.stop()
+                    dialog.reject()
+            
+            countdownTimer.timeout.connect(update_countdown)
+            countdownTimer.start(1000)
+            
+            result = dialog.exec_()
+            countdownTimer.stop()
+            
+            if result == QDialog.Accepted:
+                self.last_activity_time = datetime.datetime.now()
+                self.inactivity_timer.start(60000)
+            else:                
+                QTimer.singleShot(500, lambda: sys.exit(0))
+
+    def start_auto_save_timer(self):
+        """Start the auto-save timer with the current interval."""
+        interval_ms = self.auto_save_interval_minutes * 60000
+        self.auto_save_timer.start(interval_ms)
+    
+    def stop_auto_save_timer(self):
+        self.auto_save_timer.stop()
+    
+    def set_auto_save_interval(self, minutes: int):
+        self.auto_save_interval_minutes = minutes
+        # Restart timer with new interval if it's running
+        if self.auto_save_timer.isActive():
+            self.stop_auto_save_timer()
+            self.start_auto_save_timer()
+
+    def _auto_save(self) -> None:
+        """Export all Label layers with timestamp in the filename."""
+        # Generate timestamp for the current auto-save
+        timestamp_now = datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")
+
+        if self._is_initialized:
+            _img_layer = self._viewer.layers[self.source_cfg["name"]]
+
+            _output_dir = _img_layer.source.path
+            if _output_dir is None:
+                show_warning("Auto-save failed: No source path found for the image layer.")
+                return
+
+            # Get the dtype from the input file
+            _img_file = Path(_output_dir).name
+            _dtype = ".nii.gz" if str(_img_file).endswith(".nii.gz") else Path(_img_file).suffix
+            _output_file = _img_file.replace(_dtype, "")
+            
+            _parent_dir = Path(_output_dir).parent
+            _output_dir = _parent_dir.joinpath(f"{_output_file}_autosave_{timestamp_now}")
+            
+            try:
+                Path(_output_dir).mkdir(exist_ok=True)
+                
+                saved_files = []
+                for _layer in self._viewer.layers:
+                    if self.label_layer_name == _layer.name and np.any(_layer.data):
+                        _index = determine_layer_index(
+                            names=[
+                                layer.name for layer in self._viewer.layers if isinstance(layer, Labels)
+                            ],
+                            prefix="object ",
+                            postfix=f" - {self.source_cfg['name']}",
+                        )
+                        _file_name = f"{_output_file}_{str(_index).zfill(4)}{_dtype}"
+                    elif _layer.name.startswith("object ") and _layer.name.endswith(
+                        f" - {self.source_cfg['name']}"
+                    ):
+                        _index = int(
+                            _layer.name.replace("object ", "").replace(
+                                f" - {self.source_cfg['name']}", ""
+                            )
+                        )
+                        _file_name = f"{_output_file}_{str(_index).zfill(4)}{_dtype}"
+                    elif f"semantic map - {self.session_cfg['name']}" == _layer.name:
+                        _file_name = f"{_output_file}_semantic_map{_dtype}"
+                    elif "Merged Objects" in _layer.name:
+                        _file_name = f"{_output_file}_merged_objects{_dtype}"
+                    else:
+                        continue
+
+                    _file = str(Path(_output_dir).joinpath(_file_name))
+                    saved_files.append(_file_name)
+
+                    # reverse the corrections for non-orthogonal data and convert dummy 3d back to 2d
+                    _data = _layer.data[0] if self.source_cfg["ndim"] == 2 else _layer.data
+                    _layer_temp = Labels(
+                        _data,
+                        name="_temp",
+                        affine=self.source_cfg["affine"],
+                        scale=self.source_cfg["scale"],
+                        translate=self.source_cfg["translate"],
+                        rotate=self.source_cfg["rotate"],
+                        shear=self.source_cfg["shear"],
+                        metadata=self.source_cfg["metadata"],
+                    )
+
+                    _layer_temp._source = self.source_cfg["source"]
+                    _layer_temp.save(_file)
+                    del _layer_temp
+                
+                if saved_files:
+                    show_warning(f"Auto-saved {len(saved_files)} files at {timestamp_now}")
+            except Exception as e:
+                show_warning(f"Auto-save failed: {str(e)}")
+        else:
+            show_warning(f"Not initialized -- auto-save does nothing")
