@@ -1,4 +1,4 @@
-<img src="imgs/nnInteractive_header.png"  width="1200">
+<img src="https://github.com/MIC-DKFZ/napari-nninteractive/raw/main/imgs/nnInteractive_header.png"  width="1200">
 
 # nnInteractive: Redefining 3D Promptable Segmentation
 
@@ -24,7 +24,7 @@ Trained on 120+ diverse volumetric 3D datasets (CT, MRI, PET, 3D Microscopy, etc
 Crucially, it is the first method integrated into widely used image viewers (e.g., Napari, MITK), ensuring broad accessibility for real-world clinical and research applications.
 Extensive benchmarking demonstrates that nnInteractive far surpasses existing methods, setting a new standard for AI-driven interactive 3D segmentation.
 
-<img src="imgs/figure1_method.png" width="1200">
+<img src="https://github.com/MIC-DKFZ/napari-nninteractive/raw/main/imgs/figure1_method.png" width="1200">
 
 ## Demo Videos
 
@@ -111,7 +111,7 @@ napari demo_data/liver_145_0000.nii.gz -w napari-nninteractive
 
 **Note:** To open Nifti (.nii.gz, .nii) files we recommend to select napari-nifti.
 
-<img src="imgs/gui_instuctions.png" width="1200">
+<img src="https://github.com/MIC-DKFZ/napari-nninteractive/raw/main/imgs/gui_instuctions.png" width="1200">
 
 ## Citation
 
@@ -131,8 +131,8 @@ ______________________________________________________________________
 ## Acknowledgments
 
 <p align="left">
-  <img src="imgs/Logos/HI_Logo.png" width="150"> &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="imgs/Logos/DKFZ_Logo.png" width="500">
+  <img src="https://github.com/MIC-DKFZ/napari-nninteractive/raw/main/imgs/Logos/HI_Logo.png" width="150"> &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="https://github.com/MIC-DKFZ/napari-nninteractive/raw/main/imgs/Logos/DKFZ_Logo.png" width="500">
 </p>
 
 This repository is developed and maintained by the Applied Computer Vision Lab (ACVL)
