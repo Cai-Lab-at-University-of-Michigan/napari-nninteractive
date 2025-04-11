@@ -222,10 +222,20 @@ class BaseGUI(QWidget):
 
         _layout.addLayout(h_layout)
 
+        self.delete_mask_btn = setup_iconbutton(
+            _layout,
+            "Delete Single Object",
+            "delete",
+            self._viewer.theme,
+            self.on_delete_mask,
+            tooltips="Remove one object from the selected object layer- press X",
+            shortcut="X",
+        )
+
         self.load_mask_btn = setup_iconbutton(
             _layout,
             "Load Single Object",
-            "logo_silhouette",
+            "new_labels",
             self._viewer.theme,
             self.on_load_mask,
             tooltips="Load one object from the selected object layer- press O",
@@ -408,6 +418,9 @@ class BaseGUI(QWidget):
 
     def on_propagate_ckbx(self, *args, **kwargs):
         print("on_propagate_ckbx", *args, **kwargs)
+
+    def on_delete_mask(self):
+        pass
 
     def on_load_mask(self):
         pass

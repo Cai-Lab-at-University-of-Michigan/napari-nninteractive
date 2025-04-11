@@ -196,19 +196,48 @@ class nnInteractiveWidget(LayerControls):
 
                 self._viewer.layers[self.label_layer_name].refresh()
 
-    def on_load_mask(self):
-
+    def on_delete_mask(self):
         selected_layers = list(self._viewer.layers.selection)
-        assert len(selected_layers) == 1 and isinstance(selected_layers[0], napari.layers.Labels) # should be a single label type layer
-        _layer_data = selected_layers[0].data
-        assert (_layer_data.shape == self.session_cfg["shape"])  # Labels and Image should have same shape
+        if len(selected_layers) != 1 or not isinstance(selected_layers[0], napari.layers.Labels):
+            warnings.warn("Please select exactly one Labels layer", UserWarning, stacklevel=1)
+            return
+            
+        layer = selected_layers[0]
+        name = layer.name
+        target_class = self.class_for_init.value()
+        
+        _layer_data = layer.data
+        mask_indices = np.where(_layer_data == target_class)
+        
+        if len(mask_indices[0]) > 0:  # Check if any pixels match
+            _layer_data[mask_indices] = 0
+            layer.refresh()
+        else:
+            warnings.warn("Selected class is not valid in the layer", UserWarning, stacklevel=1)
 
-        data = _layer_data == self.class_for_init.value()
+    def on_load_mask(self):
+        selected_layers = list(self._viewer.layers.selection)
+        if len(selected_layers) != 1 or not isinstance(selected_layers[0], napari.layers.Labels):
+            warnings.warn("Please select exactly one Labels layer", UserWarning, stacklevel=1)
+            return
+        
+        layer = selected_layers[0]
+        _layer_data = layer.data
+        
+        if (_layer_data.shape != self.session_cfg["shape"]):
+            warnings.warn("Shape mismatch with session configuration", UserWarning, stacklevel=1)
+            return
 
-        if np.any(data):
+        target_class = self.class_for_init.value()
+        mask_indices = np.where(_layer_data == target_class)
+        
+        if len(mask_indices[0]) > 0:  # Check if any pixels match
             if self.session is not None:
+                mask = np.zeros(_layer_data.shape, dtype=np.uint8)
+                mask[mask_indices] = 1
+                
                 self.session.add_initial_seg_interaction(
-                    data.astype(np.uint8), run_prediction=self.auto_refine.isChecked()
+                    mask, run_prediction=self.auto_refine.isChecked()
                 )
                 self._viewer.layers[self.label_layer_name].refresh()
         else:
@@ -218,21 +247,35 @@ class nnInteractiveWidget(LayerControls):
         shape = self.session_cfg["shape"]
         selected_layers = list(self._viewer.layers.selection)
 
-        assert len(selected_layers) >= 2
-        merge_to_layer_name = selected_layers[0].name
-        data = selected_layers[0].data.copy()
-
-        for layer in selected_layers: # dispose
-            _layer_data = layer.data
-            if _layer_data.shape != shape or layer.name in [merge_to_layer_name, self.archive_layer_name] or not isinstance(layer, napari.layers.Labels) or np.amax(_layer_data) == 0:
+        if len(selected_layers) < 2:
+            warnings.warn("Please select at least two layers to merge", UserWarning, stacklevel=1)
+            return
+            
+        merge_to_layer = selected_layers[0]
+        merge_to_layer_name = merge_to_layer.name
+        
+        result_data = merge_to_layer.data
+        
+        layers_to_remove = []
+        
+        for layer in selected_layers[1:]:  # Skip the first layer (target)
+            if (layer.data.shape != shape or 
+                layer.name in [merge_to_layer_name, self.archive_layer_name] or 
+                not isinstance(layer, napari.layers.Labels) or 
+                np.amax(layer.data) == 0):
                 continue
             
-            data[_layer_data > 0] = 1
-            self._viewer.layers.remove(layer.name)
-
-        if np.any(data):
-            self._viewer.layers[merge_to_layer_name].data = data
-            self._viewer.layers[merge_to_layer_name].refresh()
+            nonzero_indices = np.where(layer.data > 0)
+            
+            if len(nonzero_indices[0]) > 0:
+                result_data[nonzero_indices] = 1
+                layers_to_remove.append(layer.name)
+        
+        for layer_name in layers_to_remove:
+            self._viewer.layers.remove(layer_name)
+        
+        if np.any(result_data > 0):
+            merge_to_layer.refresh()
 
     def on_archive_object(self):
         warnings.warn("Overlapped mask region will be overridden", UserWarning, stacklevel=1)
@@ -241,38 +284,55 @@ class nnInteractiveWidget(LayerControls):
         selected_layers = list(self._viewer.layers.selection)
         
         is_merged_object_existed = any(self.archive_layer_name == l.name for l in self._viewer.layers)
-        global_id_now = 1 if not is_merged_object_existed else np.amax(self._viewer.layers[self.archive_layer_name].data) + 1
-        data = np.zeros(shape, dtype=np.uint32) if not is_merged_object_existed else self._viewer.layers[self.archive_layer_name].data.copy()
-        any_valid = False
+        
+        # Process in two phases to reduce memory usage
+        valid_layers = []
+        need_new_layer = not is_merged_object_existed
         
         for layer in selected_layers:
-            _layer_data = layer.data
-            
-            if _layer_data.shape != shape or layer.name == self.archive_layer_name or not isinstance(layer, napari.layers.Labels) or np.amax(_layer_data) == 0:
+            if (layer.data.shape != shape or 
+                layer.name == self.archive_layer_name or 
+                not isinstance(layer, napari.layers.Labels) or 
+                np.amax(layer.data) == 0):
                 continue
-            
-            any_valid = True
-            
-            max_id = int(np.amax(_layer_data))
-            id_map = np.zeros(max_id + 1, dtype=np.uint32)
+            valid_layers.append(layer)
+        
+        if not valid_layers:
+            warnings.warn("No valid layers selected for archiving", UserWarning, stacklevel=1)
+            return
+        
+        if need_new_layer:
+            archive_data = np.zeros(shape, dtype=np.uint32)
+            global_id_now = 1
+        else:
+            archive_data = self._viewer.layers[self.archive_layer_name].data
+            global_id_now = np.amax(archive_data) + 1
+            if valid_layers:
+                archive_data = archive_data.copy()
+        
+        for layer in valid_layers:
+            _layer_data = layer.data
             
             unique_ids = np.unique(_layer_data)
             unique_ids = unique_ids[unique_ids > 0]
             
-            for idx in unique_ids:
-                id_map[idx] = global_id_now
-                global_id_now += 1
+            id_mapping = {int(old_id): global_id_now + i for i, old_id in enumerate(unique_ids)}
             
-            mask = _layer_data > 0
-            data[mask] = id_map[_layer_data[mask]]
+            for old_id in unique_ids:
+                id_indices = np.where(_layer_data == old_id)
+                if len(id_indices[0]) > 0:
+                    archive_data[id_indices] = id_mapping[int(old_id)]
+            
+            global_id_now += len(unique_ids)
+            
             if layer.name not in [self.archive_layer_name, self.label_layer_name]:
                 self._viewer.layers.remove(layer.name)
         
-        if any_valid and np.any(data):
+        if np.any(archive_data):
             if is_merged_object_existed:
-                self._viewer.layers[self.archive_layer_name].data = data
+                self._viewer.layers[self.archive_layer_name].data = archive_data
                 self._viewer.layers[self.archive_layer_name].refresh()
             else:
-                self.add_label_layer(data, self.archive_layer_name)
+                self.add_label_layer(archive_data, self.archive_layer_name)
         else:
-            warnings.warn("Merged Object layers are not valid - probably empty", UserWarning, stacklevel=1)
+            warnings.warn("No objects were archived - result would be empty", UserWarning, stacklevel=1)

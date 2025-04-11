@@ -491,6 +491,7 @@ class LayerControls(BaseGUI):
     def _export(self) -> None:
         """Export all Label layers belonging to the current image & model pair as separate files
         using the napari plugins"""
+        timestamp_now = datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")
         _img_layer = self._viewer.layers[self.source_cfg["name"]]
 
         _path = _img_layer.source.path
@@ -517,7 +518,7 @@ class LayerControls(BaseGUI):
             return
 
         elif Path(_output_dir).is_dir():
-            _output_dir = Path(_output_dir).joinpath(f"{_output_file}_nnInteractive")
+            _output_dir = Path(_output_dir).joinpath(f"{_output_file}_nnInteractive_{timestamp_now}")
             Path(_output_dir).mkdir(exist_ok=True)
 
             for _layer in self._viewer.layers:
@@ -576,7 +577,7 @@ class LayerControls(BaseGUI):
         """
         
         activity_events = [
-            QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove,
+            # QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove,
             QEvent.KeyPress, QEvent.KeyRelease
         ]
         
