@@ -383,7 +383,7 @@ class LayerControls(BaseGUI):
         else:
             _sem_name = f"semantic map - {self.session_cfg['name']}"
             if _sem_name not in self._viewer.layers:
-                self.add_label_layer(np.zeros_like(label_layer.data), _sem_name)
+                self.add_label_layer(np.zeros_like(label_layer.data, dtype=np.uint16), _sem_name)
 
             sem_layer = self._viewer.layers[_sem_name]
 
