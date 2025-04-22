@@ -29,6 +29,9 @@ from napari_nninteractive.utils.affine import is_orthogonal
 from napari_nninteractive.utils.utils import ColorMapper, determine_layer_index
 from napari_nninteractive.widget_gui import BaseGUI
 
+from napari_nninteractive.gpu_lock import GPUMemoryLock
+from filelock import FileLock
+
 layer_to_controls[SinglePointLayer] = CustomQtPointsControls
 layer_to_controls[BBoxLayer] = CustomQtBBoxControls
 layer_to_controls[ScribbleLayer] = CustomQtScribbleControls
@@ -383,7 +386,7 @@ class LayerControls(BaseGUI):
         else:
             _sem_name = f"semantic map - {self.session_cfg['name']}"
             if _sem_name not in self._viewer.layers:
-                self.add_label_layer(np.zeros_like(label_layer.data), _sem_name)
+                self.add_label_layer(np.zeros_like(label_layer.data, dtype=np.uint16), _sem_name)
 
             sem_layer = self._viewer.layers[_sem_name]
 
@@ -442,7 +445,34 @@ class LayerControls(BaseGUI):
 
     def on_run(self):
         if self.session is not None:
-            self.session._predict()
+            lock_manager = GPUMemoryLock(memory_per_lock=12)
+            memory_needed = 12  # GB
+            # Try non-blocking acquire
+            cuda_idx, locks = lock_manager.acquire_memory(memory_needed)
+
+            if locks:
+                try:
+                    self.session._predict()
+                finally:
+                    lock_manager.release_locks(locks)
+            else:
+                # Try blocking acquire on first assigned GPU
+                locks_needed = max(1, int((memory_needed + lock_manager.memory_per_lock - 1) / lock_manager.memory_per_lock))
+                acquired = []
+                
+                # Only use the first visible GPU when blocking
+                for i in range(locks_needed):
+                    lock_file = lock_manager.lock_files.get((0, i))
+                    if lock_file:
+                        lock = FileLock(lock_file, timeout=30)
+                        lock.acquire()
+                        acquired.append(lock)
+                
+                try:
+                    self.session._predict()
+                finally:
+                    lock_manager.release_locks(acquired)
+
             self._viewer.layers[self.label_layer_name].refresh()
 
     def on_interaction(self, event: Any):

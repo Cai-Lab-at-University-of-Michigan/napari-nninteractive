@@ -87,6 +87,7 @@ class BaseGUI(QWidget):
         self.class_for_init.setEnabled(False)
         self.auto_refine.setEnabled(False)
         # self.empty_mask_btn.setEnabled(False)
+        self.delete_mask_btn.setEnabled(False)
         self.load_mask_btn.setEnabled(False)
         self.merge_mask_btn.setEnabled(False)
         self.archive_object_btn.setEnabled(False)
@@ -110,6 +111,7 @@ class BaseGUI(QWidget):
         self.class_for_init.setEnabled(True)
         self.auto_refine.setEnabled(True)
         # self.empty_mask_btn.setEnabled(True)
+        self.delete_mask_btn.setEnabled(True)
         self.load_mask_btn.setEnabled(True)
         self.merge_mask_btn.setEnabled(True)
         self.archive_object_btn.setEnabled(True)
@@ -194,7 +196,7 @@ class BaseGUI(QWidget):
         self.instance_aggregation_ckbx = setup_checkbox(
             _layout,
             "Instance Aggregation",
-            False,
+            True,
             tooltips="If checked: Add all objects to a single layer. In the case of overlap newer objects overwrite older objects.\n"
             "Otherwise: Create a separate layer for each object. ",
         )
@@ -219,6 +221,7 @@ class BaseGUI(QWidget):
         _text.setFixedWidth(70)
         self.class_for_init = setup_spinbox(h_layout, default=1, stretch=1)
         self.class_for_init.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.class_for_init.setMaximum(65535)
 
         _layout.addLayout(h_layout)
 
