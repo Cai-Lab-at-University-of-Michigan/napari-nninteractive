@@ -13,9 +13,9 @@ class GPUMemoryLock:
         locks_dir = "/tmp/gpu_locks"
         os.makedirs(locks_dir, exist_ok=True)
         
-        # Set directory permissions to 666 (rw-rw-rw-)
+        # Set directory permissions to 777 (rwxrwxrwx)
         try:
-            os.chmod(locks_dir, 0o666)
+            os.chmod(locks_dir, 0o777)
         except PermissionError:
             print(f"Warning: Could not set permissions on {locks_dir}. You may need admin rights.")
         
@@ -138,3 +138,48 @@ class GPUMemoryLock:
                 lock.release()
             except:
                 pass
+    
+    def release_and_delete_locks(self, locks):
+        """Release all provided locks and delete the associated lock files"""
+        for lock in locks:
+            try:
+                # Get the lock file path before releasing
+                lock_path = lock.lock_file
+                
+                # Release the lock
+                lock.release()
+                
+                # Delete the lock file if it exists
+                if os.path.exists(lock_path):
+                    try:
+                        os.remove(lock_path)
+                        print(f"Deleted lock file: {lock_path}")
+                    except PermissionError:
+                        print(f"Warning: Could not delete lock file {lock_path}. Permission denied.")
+                    except Exception as e:
+                        print(f"Warning: Error deleting lock file {lock_path}: {e}")
+            except Exception as e:
+                print(f"Warning: Error releasing lock: {e}")
+
+# Example usage:
+if __name__ == "__main__":
+    # Create a GPU memory lock manager
+    gpu_lock = GPUMemoryLock(memory_per_lock=4)  # 4GB per lock
+    
+    # Try to acquire 8GB of GPU memory
+    gpu_id, locks = gpu_lock.acquire_memory(8)
+    
+    if gpu_id is not None:
+        print(f"Successfully acquired memory on GPU {gpu_id}")
+        
+        # Simulate doing work with the GPU
+        import time
+        print("Processing on GPU...")
+        time.sleep(5)
+        
+        # Release locks and delete the lock files when done
+        print("Releasing locks and deleting lock files...")
+        gpu_lock.release_and_delete_locks(locks)
+        print("Done!")
+    else:
+        print("Failed to acquire required GPU memory")

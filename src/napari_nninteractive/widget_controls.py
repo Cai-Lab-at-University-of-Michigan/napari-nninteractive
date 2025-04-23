@@ -466,7 +466,8 @@ class LayerControls(BaseGUI):
                 except TimeoutError:
                     show_warning("Prediction timed out (30s limit)")
                 finally:
-                    lock_manager.release_locks(locks)
+                    # Use our new method to release and delete the lock files
+                    lock_manager.release_and_delete_locks(locks)
             else:
                 # Try blocking acquisition with shorter timeout
                 locks_needed = max(1, int((memory_needed + lock_manager.memory_per_lock - 1) / 
@@ -491,7 +492,8 @@ class LayerControls(BaseGUI):
                 except TimeoutError:
                     show_warning("Prediction timed out")
                 finally:
-                    lock_manager.release_locks(acquired)
+                    # Use our new method here too instead of just releasing locks
+                    lock_manager.release_and_delete_locks(acquired)
                     
         except Exception as e:
             print(f"Error during prediction: {e}")
