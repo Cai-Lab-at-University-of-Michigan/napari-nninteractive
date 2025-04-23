@@ -58,6 +58,7 @@ class GPUMemoryLock:
         cuda_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
         if cuda_devices:
             # Parse the physical GPU IDs
+            print(f"Using Physical GPU: {cuda_devices}")
             return [int(x.strip()) for x in cuda_devices.split(",") if x.strip()]
         
         # If CUDA_VISIBLE_DEVICES isn't set, get all available GPUs
