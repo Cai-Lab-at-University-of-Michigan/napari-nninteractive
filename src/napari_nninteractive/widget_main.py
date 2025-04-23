@@ -196,6 +196,34 @@ class nnInteractiveWidget(LayerControls):
 
                 self._viewer.layers[self.label_layer_name].refresh()
 
+    def on_load_semantic_mask(self):
+        selected_layers = list(self._viewer.layers.selection)
+        if len(selected_layers) != 1 or not isinstance(selected_layers[0], napari.layers.Labels):
+            warnings.warn("Please select exactly one Labels layer", UserWarning, stacklevel=1)
+            return
+        
+        layer = selected_layers[0]
+        _layer_data = layer.data
+        
+        if (_layer_data.shape != self.session_cfg["shape"]):
+            warnings.warn("Shape mismatch with session configuration", UserWarning, stacklevel=1)
+            return
+
+        semantic_layer_name = f"semantic map - {self.session_cfg['name']}"
+        is_semantic_label_layer_existed = any(semantic_layer_name == l.name for l in self._viewer.layers)
+
+        if np.any(_layer_data):
+            if is_semantic_label_layer_existed:
+                warnings.warn("Replacing the current semantic label layer", UserWarning, stacklevel=1)
+                self._viewer.layers[semantic_layer_name].data = _layer_data
+                self._viewer.layers[semantic_layer_name].refresh()
+            else:
+                self.add_label_layer(_layer_data, semantic_layer_name)
+            
+            self._viewer.layers.remove(layer.name)
+        else:
+            warnings.warn("No annotation found - result would be empty", UserWarning, stacklevel=1)
+
     def on_delete_mask(self):
         selected_layers = list(self._viewer.layers.selection)
         if len(selected_layers) != 1 or not isinstance(selected_layers[0], napari.layers.Labels):
