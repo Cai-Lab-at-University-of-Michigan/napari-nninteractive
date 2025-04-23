@@ -1,4 +1,5 @@
 import os
+import stat
 from filelock import FileLock
 
 class GPUMemoryLock:
@@ -8,9 +9,15 @@ class GPUMemoryLock:
         # Get the actual physical GPU IDs, not the CUDA_VISIBLE_DEVICES mapping
         self.physical_gpu_ids = self._get_physical_gpu_ids()
         
-        # Create locks directory
+        # Create locks directory with read/write permissions for everyone
         locks_dir = "/tmp/gpu_locks"
         os.makedirs(locks_dir, exist_ok=True)
+        
+        # Set directory permissions to 666 (rw-rw-rw-)
+        try:
+            os.chmod(locks_dir, 0o666)
+        except PermissionError:
+            print(f"Warning: Could not set permissions on {locks_dir}. You may need admin rights.")
         
         # Get actual memory for each GPU
         self.gpu_memory = self._get_gpu_memory()
@@ -25,6 +32,23 @@ class GPUMemoryLock:
                 # Use physical GPU ID for lock file names
                 lock_path = f"{locks_dir}/physical_gpu_{physical_id}_mem_{lock_id}.lock"
                 self.lock_files[(idx, lock_id)] = lock_path
+                
+                # Create empty lock file with read/write permissions if it doesn't exist
+                self._ensure_lock_file_has_rw_permissions(lock_path)
+    
+    def _ensure_lock_file_has_rw_permissions(self, lock_path):
+        """Ensure the lock file exists with read/write permissions (666)"""
+        try:
+            # Create the file if it doesn't exist
+            if not os.path.exists(lock_path):
+                with open(lock_path, 'w') as f:
+                    pass
+                
+            # Set permissions to 666 (rw-rw-rw-) - read/write for all users
+            os.chmod(lock_path, 0o666)
+            
+        except PermissionError:
+            print(f"Warning: Could not set permissions on {lock_path}")
     
     def _get_physical_gpu_ids(self):
         """
@@ -86,6 +110,10 @@ class GPUMemoryLock:
                 
                 for i in range(start_lock, start_lock + locks_needed):
                     lock_file = self.lock_files.get((idx, i))
+                    
+                    # Ensure the lock file has proper permissions before trying to acquire
+                    self._ensure_lock_file_has_rw_permissions(lock_file)
+                    
                     try:
                         lock = FileLock(lock_file, timeout=0.1)
                         lock.acquire()
