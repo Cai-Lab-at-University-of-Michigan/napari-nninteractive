@@ -199,14 +199,14 @@ class nnInteractiveWidget(LayerControls):
     def on_load_semantic_mask(self):
         selected_layers = list(self._viewer.layers.selection)
         if len(selected_layers) != 1 or not isinstance(selected_layers[0], napari.layers.Labels):
-            warnings.warn("Please select exactly one Labels layer", UserWarning, stacklevel=1)
+            print("Please select exactly one Labels layer", UserWarning, stacklevel=1)
             return
         
         layer = selected_layers[0]
         _layer_data = layer.data
         
         if (_layer_data.shape != self.session_cfg["shape"]):
-            warnings.warn("Shape mismatch with session configuration", UserWarning, stacklevel=1)
+            print("Shape mismatch with session configuration", UserWarning, stacklevel=1)
             return
 
         semantic_layer_name = f"semantic map - {self.session_cfg['name']}"
@@ -214,7 +214,7 @@ class nnInteractiveWidget(LayerControls):
 
         if np.any(_layer_data):
             if is_semantic_label_layer_existed:
-                warnings.warn("Replacing the current semantic label layer", UserWarning, stacklevel=1)
+                print("Replacing the current semantic label layer", UserWarning, stacklevel=1)
                 self._viewer.layers[semantic_layer_name].data = _layer_data
                 self._viewer.layers[semantic_layer_name].refresh()
             else:
@@ -222,12 +222,12 @@ class nnInteractiveWidget(LayerControls):
             
             self._viewer.layers.remove(layer.name)
         else:
-            warnings.warn("No annotation found - result would be empty", UserWarning, stacklevel=1)
+            print("No annotation found - result would be empty", UserWarning, stacklevel=1)
 
     def on_delete_mask(self):
         selected_layers = list(self._viewer.layers.selection)
         if len(selected_layers) != 1 or not isinstance(selected_layers[0], napari.layers.Labels):
-            warnings.warn("Please select exactly one Labels layer", UserWarning, stacklevel=1)
+            print("Please select exactly one Labels layer", UserWarning, stacklevel=1)
             return
             
         layer = selected_layers[0]
@@ -241,19 +241,19 @@ class nnInteractiveWidget(LayerControls):
             _layer_data[mask_indices] = 0
             layer.refresh()
         else:
-            warnings.warn("Selected class is not valid in the layer", UserWarning, stacklevel=1)
+            print("Selected class is not valid in the layer", UserWarning, stacklevel=1)
 
     def on_load_mask(self):
         selected_layers = list(self._viewer.layers.selection)
         if len(selected_layers) != 1 or not isinstance(selected_layers[0], napari.layers.Labels):
-            warnings.warn("Please select exactly one Labels layer", UserWarning, stacklevel=1)
+            print("Please select exactly one Labels layer", UserWarning, stacklevel=1)
             return
         
         layer = selected_layers[0]
         _layer_data = layer.data
         
         if (_layer_data.shape != self.session_cfg["shape"]):
-            warnings.warn("Shape mismatch with session configuration", UserWarning, stacklevel=1)
+            print("Shape mismatch with session configuration", UserWarning, stacklevel=1)
             return
 
         target_class = self.class_for_init.value()
@@ -269,14 +269,14 @@ class nnInteractiveWidget(LayerControls):
                 )
                 self._viewer.layers[self.label_layer_name].refresh()
         else:
-            warnings.warn("Mask is not valid - probably its empty", UserWarning, stacklevel=1)
+            print("Mask is not valid - probably its empty", UserWarning, stacklevel=1)
 
     def on_merge_mask(self):
         shape = self.session_cfg["shape"]
         selected_layers = list(self._viewer.layers.selection)
 
         if len(selected_layers) < 2:
-            warnings.warn("Please select at least two layers to merge", UserWarning, stacklevel=1)
+            print("Please select at least two layers to merge", UserWarning, stacklevel=1)
             return
             
         merge_to_layer = selected_layers[0]
@@ -306,7 +306,7 @@ class nnInteractiveWidget(LayerControls):
             merge_to_layer.refresh()
 
     def on_archive_object(self):
-        warnings.warn("Overlapped mask region will be overridden", UserWarning, stacklevel=1)
+        print("Overlapped mask region will be overridden", UserWarning, stacklevel=1)
 
         shape = self.session_cfg["shape"]
         selected_layers = list(self._viewer.layers.selection)
@@ -326,7 +326,7 @@ class nnInteractiveWidget(LayerControls):
             valid_layers.append(layer)
         
         if not valid_layers:
-            warnings.warn("No valid layers selected for archiving", UserWarning, stacklevel=1)
+            print("No valid layers selected for archiving", UserWarning, stacklevel=1)
             return
         
         if need_new_layer:
@@ -363,4 +363,4 @@ class nnInteractiveWidget(LayerControls):
             else:
                 self.add_label_layer(archive_data, self.archive_layer_name)
         else:
-            warnings.warn("No objects were archived - result would be empty", UserWarning, stacklevel=1)
+            print("No objects were archived - result would be empty", UserWarning, stacklevel=1)

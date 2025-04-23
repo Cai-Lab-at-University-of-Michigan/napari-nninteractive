@@ -464,7 +464,7 @@ class LayerControls(BaseGUI):
                     with timeout(30):  # 30s timeout to leave buffer for cleanup
                         self.session._predict()
                 except TimeoutError:
-                    show_warning("Prediction timed out (30s limit)")
+                    print("Prediction timed out (30s limit)")
                 finally:
                     # Use our new method to release and delete the lock files
                     lock_manager.release_and_delete_locks(locks)
@@ -490,7 +490,7 @@ class LayerControls(BaseGUI):
                     with timeout(25):  # 25s for prediction
                         self.session._predict()
                 except TimeoutError:
-                    show_warning("Prediction timed out")
+                    print("Prediction timed out")
                 finally:
                     # Use our new method here too instead of just releasing locks
                     lock_manager.release_and_delete_locks(acquired)
@@ -758,7 +758,7 @@ class LayerControls(BaseGUI):
 
             _output_dir = _img_layer.source.path
             if _output_dir is None:
-                show_warning("Auto-save failed: No source path found for the image layer.")
+                print("Auto-save failed: No source path found for the image layer.")
                 return
 
             # Get the dtype from the input file
@@ -820,8 +820,8 @@ class LayerControls(BaseGUI):
                     del _layer_temp
                 
                 if saved_files:
-                    show_warning(f"Auto-saved {len(saved_files)} files at {timestamp_now}")
+                    print(f"Auto-saved {len(saved_files)} files at {timestamp_now}")
             except Exception as e:
-                show_warning(f"Auto-save failed: {str(e)}")
+                print(f"Auto-save failed: {str(e)}")
         else:
-            show_warning(f"Not initialized -- auto-save does nothing")
+            print(f"Not initialized -- auto-save does nothing")
