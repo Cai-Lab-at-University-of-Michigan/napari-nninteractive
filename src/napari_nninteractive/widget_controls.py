@@ -31,6 +31,7 @@ from napari_nninteractive.widget_gui import BaseGUI
 
 from napari_nninteractive.gpu_lock import GPUMemoryLock
 from filelock import FileLock
+from napari_nninteractive.timeout import timeout
 
 layer_to_controls[SinglePointLayer] = CustomQtPointsControls
 layer_to_controls[BBoxLayer] = CustomQtBBoxControls
@@ -360,7 +361,7 @@ class LayerControls(BaseGUI):
 
         # Lock the Session
         self._lock_session()
-        self._is_initialized = False
+        self._is_initialized = True
 
     def on_reset_interactions(self):
         """Reset only the current interaction"""
@@ -444,35 +445,58 @@ class LayerControls(BaseGUI):
             self._viewer.window._qt_viewer.setFocus()
 
     def on_run(self):
-        if self.session is not None:
+        if self.session is None:
+            return
+            
+        # Reduced memory footprint if possible
+        memory_needed = 12  # GB, adjusted based on model requirements
+        
+        try:
             lock_manager = GPUMemoryLock(memory_per_lock=12)
-            memory_needed = 12  # GB
-            # Try non-blocking acquire
+            
+            # First try non-blocking
             cuda_idx, locks = lock_manager.acquire_memory(memory_needed)
-
+            
             if locks:
+                # Non-blocking acquisition succeeded
                 try:
-                    self.session._predict()
+                    # Set a timeout for prediction
+                    with timeout(30):  # 30s timeout to leave buffer for cleanup
+                        self.session._predict()
+                except TimeoutError:
+                    show_warning("Prediction timed out (30s limit)")
                 finally:
                     lock_manager.release_locks(locks)
             else:
-                # Try blocking acquire on first assigned GPU
-                locks_needed = max(1, int((memory_needed + lock_manager.memory_per_lock - 1) / lock_manager.memory_per_lock))
+                # Try blocking acquisition with shorter timeout
+                locks_needed = max(1, int((memory_needed + lock_manager.memory_per_lock - 1) / 
+                                        lock_manager.memory_per_lock))
                 acquired = []
                 
-                # Only use the first visible GPU when blocking
-                for i in range(locks_needed):
-                    lock_file = lock_manager.lock_files.get((0, i))
-                    if lock_file:
-                        lock = FileLock(lock_file, timeout=30)
-                        lock.acquire()
-                        acquired.append(lock)
+                # Use a shorter timeout to ensure we have time for prediction
+                lock_timeout = 5  # seconds
                 
                 try:
-                    self.session._predict()
+                    # Only use the first visible GPU when blocking
+                    for i in range(locks_needed):
+                        lock_file = lock_manager.lock_files.get((0, i))
+                        if lock_file:
+                            lock = FileLock(lock_file, timeout=lock_timeout)
+                            lock.acquire()
+                            acquired.append(lock)
+                    
+                    # Set timeout for prediction (remaining time)
+                    with timeout(25):  # 25s for prediction
+                        self.session._predict()
+                except TimeoutError:
+                    show_warning("Prediction timed out")
                 finally:
                     lock_manager.release_locks(acquired)
-
+                    
+        except Exception as e:
+            print(f"Error during prediction: {e}")
+        finally:
+            # Ensure UI is refreshed even if an exception occurred
             self._viewer.layers[self.label_layer_name].refresh()
 
     def on_interaction(self, event: Any):
