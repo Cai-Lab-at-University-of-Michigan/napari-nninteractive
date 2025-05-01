@@ -219,6 +219,8 @@ class nnInteractiveWidget(LayerControls):
                 self._viewer.layers[semantic_layer_name].refresh()
             else:
                 self.add_label_layer(_layer_data, semantic_layer_name)
+
+            self.object_index = np.amax(_layer_data)
             
             self._viewer.layers.remove(layer.name)
         else:
