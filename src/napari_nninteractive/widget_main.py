@@ -1,4 +1,5 @@
 import os
+import sys
 import napari
 import warnings
 from pathlib import Path
@@ -11,7 +12,8 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from napari.utils.notifications import show_warning
 from napari.viewer import Viewer
 from nnunetv2.utilities.find_class_by_name import recursive_find_python_class
-from qtpy.QtWidgets import QWidget
+from qtpy.QtWidgets import QWidget, QDialog, QVBoxLayout, QLabel, QPushButton
+from qtpy.QtCore import QTimer, Qt
 
 from napari_nninteractive.widget_controls import LayerControls
 
@@ -89,6 +91,11 @@ class nnInteractiveWidget(LayerControls):
             )
 
         _data = np.array(self._viewer.layers[self.session_cfg["name"]].data)
+
+        # size warning
+        if np.prod(_data.shape) > 512**3:
+            self._show_file_size_warning()
+
         _data = _data[np.newaxis, ...]
 
         if self.source_cfg["ndim"] == 2:
@@ -103,6 +110,38 @@ class nnInteractiveWidget(LayerControls):
         # Set the prompt type to positive
         self.prompt_button._uncheck()
         self.prompt_button._check(0)
+
+    def _show_file_size_warning(self):
+        """
+        Show file size warning dialog and quit application.
+        """
+        message = "Please use file size < 128 Mb!"
+        
+        class FileSizeDialog(QDialog):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.setWindowTitle("File Size Too Large Error")
+                self.setWindowFlag(Qt.WindowStaysOnTopHint)
+                self.setMinimumWidth(300)
+                
+                layout = QVBoxLayout()
+                
+                messageLabel = QLabel(message)
+                messageLabel.setAlignment(Qt.AlignCenter)
+                layout.addWidget(messageLabel)
+                
+                okButton = QPushButton("OK")
+                okButton.clicked.connect(self.accept)
+                layout.addWidget(okButton)
+                
+                self.setLayout(layout)
+        
+        dialog = FileSizeDialog(self)
+        dialog.setStyleSheet("color: red; font-weight: bold;")
+        dialog.exec_()
+        
+        # Auto quit after dialog is closed
+        QTimer.singleShot(100, lambda: sys.exit(0))
 
     def on_model_selected(self):
         """Reset the current session completely"""

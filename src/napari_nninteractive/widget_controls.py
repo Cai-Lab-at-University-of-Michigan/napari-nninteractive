@@ -33,10 +33,46 @@ from napari_nninteractive.gpu_lock import GPUMemoryLock
 from filelock import FileLock
 from napari_nninteractive.timeout import timeout
 
+import pandas as pd
+from scipy import ndimage
+
 layer_to_controls[SinglePointLayer] = CustomQtPointsControls
 layer_to_controls[BBoxLayer] = CustomQtBBoxControls
 layer_to_controls[ScribbleLayer] = CustomQtScribbleControls
 layer_to_controls[LassoLayer] = CustomQtLassoControls
+
+
+def find_centers(data):
+   df = pd.DataFrame({
+       'Track N': [],
+       'Slice N': [],
+       'X': [],
+       'Y': []
+   })
+
+   centers = []
+   
+   for frame in range(data.shape[0]):
+       frame_data = data[frame]
+       
+       unique_ids = np.unique(frame_data)
+       unique_ids = unique_ids[unique_ids != 0]
+       
+       for obj_id in unique_ids:
+           mask = frame_data == obj_id
+           
+           if np.any(mask):
+               cnt_y, cnt_x = ndimage.center_of_mass(mask)
+               
+               centers.append({
+                   'Track N': int(obj_id),
+                   'Slice N': frame,
+                   'X': cnt_x,
+                   'Y': cnt_y
+               })
+   
+   df = pd.DataFrame(centers)
+   return df.sort_values(by=['Track N', 'Slice N', 'X', 'Y'])
 
 
 class LayerControls(BaseGUI):
@@ -608,6 +644,8 @@ class LayerControls(BaseGUI):
 
                 # reverse the corrections for non-orthogonal data and convert dummy 3d back to 2d
                 _data = _layer.data[0] if self.source_cfg["ndim"] == 2 else _layer.data
+                find_centers(_data).to_csv(_file.replace(_dtype, '.csv'), index=False)
+
                 _layer_temp = Labels(
                     _data,
                     name="_temp",
@@ -804,6 +842,7 @@ class LayerControls(BaseGUI):
 
                     # reverse the corrections for non-orthogonal data and convert dummy 3d back to 2d
                     _data = _layer.data[0] if self.source_cfg["ndim"] == 2 else _layer.data
+                    find_centers(_data).to_csv(_file.replace(_dtype, '.csv'), index=False)
                     _layer_temp = Labels(
                         _data,
                         name="_temp",
