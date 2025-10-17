@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 
 from napari.layers import Image, Labels
@@ -127,7 +128,7 @@ class BaseGUI(QWidget):
         """Initializes the model selection as a combo box."""
         _group_box, _layout = setup_vgroupbox(text="Model Selection:")
 
-        model_options = ["nnInteractive_v1.0"]
+        model_options = ["nnInteractive_v1.0", "MORF3_Neurite_v1.0"]
 
         self.model_selection = setup_combobox(
             _layout, options=model_options, function=self.on_model_selected
