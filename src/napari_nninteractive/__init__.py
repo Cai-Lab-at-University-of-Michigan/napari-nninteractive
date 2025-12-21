@@ -1,4 +1,5 @@
 __version__ = "1.0.3"
 from .widget_main import nnInteractiveWidget
+from .neuron_annotator import start_annotator
 
-__all__ = ("nnInteractiveWidget",)
+__all__ = ("nnInteractiveWidget", "start_annotator")
