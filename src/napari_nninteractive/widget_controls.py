@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
+import nibabel as nib
 import numpy as np
 from huggingface_hub import snapshot_download
 from napari._qt.layer_controls.qt_layer_controls_container import layer_to_controls
@@ -608,20 +609,34 @@ class LayerControls(BaseGUI):
 
                 # reverse the corrections for non-orthogonal data and convert dummy 3d back to 2d
                 _data = _layer.data[0] if self.source_cfg["ndim"] == 2 else _layer.data
-                _layer_temp = Labels(
-                    _data,
-                    name="_temp",
-                    affine=self.source_cfg["affine"],
-                    scale=self.source_cfg["scale"],
-                    translate=self.source_cfg["translate"],
-                    rotate=self.source_cfg["rotate"],
-                    shear=self.source_cfg["shear"],
-                    metadata=self.source_cfg["metadata"],
-                )
 
-                _layer_temp._source = self.source_cfg["source"]
-                _layer_temp.save(_file)
-                del _layer_temp
+                # Use nibabel directly to preserve original NIfTI header
+                _source_path = self.source_cfg["source"].path
+                if _source_path and str(_source_path).endswith(('.nii', '.nii.gz')):
+                    _orig_nii = nib.load(_source_path)
+                    _new_nii = nib.Nifti1Image(
+                        _data.astype(np.uint8),
+                        affine=_orig_nii.affine,
+                        header=_orig_nii.header.copy()
+                    )
+                    _new_nii.header.set_data_shape(_data.shape)
+                    _new_nii.header.set_data_dtype(np.uint8)
+                    nib.save(_new_nii, _file)
+                else:
+                    # Fallback to napari save for non-NIfTI formats
+                    _layer_temp = Labels(
+                        _data,
+                        name="_temp",
+                        affine=self.source_cfg["affine"],
+                        scale=self.source_cfg["scale"],
+                        translate=self.source_cfg["translate"],
+                        rotate=self.source_cfg["rotate"],
+                        shear=self.source_cfg["shear"],
+                        metadata=self.source_cfg["metadata"],
+                    )
+                    _layer_temp._source = self.source_cfg["source"]
+                    _layer_temp.save(_file)
+                    del _layer_temp
         else:
             raise ValueError("Output path has to be a directory, not a file")
 
@@ -804,21 +819,35 @@ class LayerControls(BaseGUI):
 
                     # reverse the corrections for non-orthogonal data and convert dummy 3d back to 2d
                     _data = _layer.data[0] if self.source_cfg["ndim"] == 2 else _layer.data
-                    _layer_temp = Labels(
-                        _data,
-                        name="_temp",
-                        affine=self.source_cfg["affine"],
-                        scale=self.source_cfg["scale"],
-                        translate=self.source_cfg["translate"],
-                        rotate=self.source_cfg["rotate"],
-                        shear=self.source_cfg["shear"],
-                        metadata=self.source_cfg["metadata"],
-                    )
 
-                    _layer_temp._source = self.source_cfg["source"]
-                    _layer_temp.save(_file)
-                    del _layer_temp
-                
+                    # Use nibabel directly to preserve original NIfTI header
+                    _source_path = self.source_cfg["source"].path
+                    if _source_path and str(_source_path).endswith(('.nii', '.nii.gz')):
+                        _orig_nii = nib.load(_source_path)
+                        _new_nii = nib.Nifti1Image(
+                            _data.astype(np.uint8),
+                            affine=_orig_nii.affine,
+                            header=_orig_nii.header.copy()
+                        )
+                        _new_nii.header.set_data_shape(_data.shape)
+                        _new_nii.header.set_data_dtype(np.uint8)
+                        nib.save(_new_nii, _file)
+                    else:
+                        # Fallback to napari save for non-NIfTI formats
+                        _layer_temp = Labels(
+                            _data,
+                            name="_temp",
+                            affine=self.source_cfg["affine"],
+                            scale=self.source_cfg["scale"],
+                            translate=self.source_cfg["translate"],
+                            rotate=self.source_cfg["rotate"],
+                            shear=self.source_cfg["shear"],
+                            metadata=self.source_cfg["metadata"],
+                        )
+                        _layer_temp._source = self.source_cfg["source"]
+                        _layer_temp.save(_file)
+                        del _layer_temp
+
                 if saved_files:
                     print(f"Auto-saved {len(saved_files)} files at {timestamp_now}")
             except Exception as e:
