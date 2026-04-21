@@ -29,11 +29,15 @@ dependencies = [
     "torch",
     "numpy",
     "qtpy",
+    "magicgui",
     "napari-nifti",
     "huggingface_hub",
     "hf_transfer",
     "nnInteractive>=1.0.0",
     "napari_toolkit",
+    "scikit-image",
+    "scipy",
+    "SimpleITK",
 ]
 
 [project.optional-dependencies]

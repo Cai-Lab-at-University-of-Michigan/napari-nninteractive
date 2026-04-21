@@ -9,6 +9,11 @@ contributions:
     - id: napari-nninteractive.nnInteractiveWidget
       python_name: napari_nninteractive:nnInteractiveWidget
       title: nnInteractive
+    - id: napari-nninteractive.NeuronAnnotator
+      python_name: napari_nninteractive:start_annotator
+      title: Neuron Annotator (Flood Fill)
   widgets:
     - command: napari-nninteractive.nnInteractiveWidget
       display_name: nnInteractive
+    - command: napari-nninteractive.NeuronAnnotator
+      display_name: Neuron Annotator
